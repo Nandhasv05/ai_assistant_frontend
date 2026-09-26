@@ -1411,6 +1411,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 
 html.is-embed .workspace, html.is-embed .landing { padding: 12px; }
 html.is-embed .command-bar { width: calc(100% - 24px); margin-bottom: 10px; }
+html.is-embed .sidebar {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+html.is-embed .main-stage.is-landing {
+  gap: 22px;
+}
 
 @media (max-width: 800px) {
   .sidebar {
