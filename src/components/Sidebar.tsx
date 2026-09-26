@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { APP_MODULES } from "../lib/modules.ts";
 import type { Conversation, WorkspaceId } from "../types.ts";
+import { NavIcon } from "./NavIcon.tsx";
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -79,15 +80,19 @@ export function Sidebar({
       <button type="button" className={`sidebar-backdrop ${open ? "is-visible" : ""}`} aria-label="Close navigation" onClick={onClose} />
       <aside className={`sidebar ${open ? "is-open" : ""}`}>
         <div className="brand-block">
-          <span className="brand-mark" aria-hidden="true">EV</span>
+          <span className="brand-mark" aria-hidden="true">
+            EV
+          </span>
           <div>
             <strong>EVOLV</strong>
             <span>AI COPILOT</span>
           </div>
         </div>
 
-        <nav className="module-nav" aria-label="Modules">
+        <p className="sidebar-label">AI modules</p>
+        <nav className="module-nav" aria-label="AI modules">
           <button type="button" className={`nav-item ${workspace === "overview" ? "is-active" : ""}`} onClick={() => onOpenWorkspace("overview")}>
+            <NavIcon name="overview" />
             Overview
           </button>
           {APP_MODULES.map((module) => (
@@ -97,7 +102,11 @@ export function Sidebar({
               className={`nav-item ${workspace === module.id ? "is-active" : ""}`}
               onClick={() => onOpenWorkspace(module.id)}
             >
-              {module.name}
+              <NavIcon name={module.id} />
+              <span className="nav-copy">
+                <em>{module.name}</em>
+                <small>{module.code}</small>
+              </span>
             </button>
           ))}
         </nav>
@@ -105,6 +114,7 @@ export function Sidebar({
         <button type="button" className="sidebar-new" onClick={onNewChat}>
           + New conversation
         </button>
+
         <label className="sidebar-search">
           <span className="sr-only">Search conversations</span>
           <input type="search" placeholder="Search conversations" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -159,7 +169,7 @@ export function Sidebar({
         </div>
 
         <div className={`sidebar-foot is-${health}`}>
-          <span className={`sync-dot is-${health}`}>SAP LIVE</span>
+          <span className={`sync-dot is-${health}`} />
           <div>
             <strong>{healthLabel}</strong>
             <em>{lastSync}</em>

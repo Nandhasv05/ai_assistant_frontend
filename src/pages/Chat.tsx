@@ -4,11 +4,11 @@ import { ChatWindow } from "../components/ChatWindow.tsx";
 import { CommandBar } from "../components/CommandBar.tsx";
 import { ContextPanel } from "../components/ContextPanel.tsx";
 import { Sidebar } from "../components/Sidebar.tsx";
-import { contextFacts, DEFAULT_COMMAND_SUGGESTIONS, extractOrder, followUpsFor } from "../lib/copilot.ts";
+import { contextFacts, DEFAULT_COMMAND_SUGGESTIONS, extractOrder, followUpsFor, SNAPSHOT_QUERY } from "../lib/copilot.ts";
 import { newId } from "../lib/id.ts";
-import { getModule } from "../lib/modules.ts";
+import { getModule, moduleTitle } from "../lib/modules.ts";
 import { fetchHealth, sendChatMessage } from "../services/api.ts";
-import type { ChatMessage, Conversation, WorkspaceId } from "../types.ts";
+import type { AssistantView, ChatMessage, Conversation, WorkspaceId } from "../types.ts";
 
 const STORAGE_KEY = "ai-assistant.conversations";
 
@@ -57,17 +57,14 @@ export function Chat() {
   const [contextOpen, setContextOpen] = useState(true);
   const [health, setHealth] = useState<"checking" | "ok" | "down">("checking");
   const [lastSapOkAt, setLastSapOkAt] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<Partial<Record<WorkspaceId, AssistantView>>>({});
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
   const sendingRef = useRef(false);
+  const snapshotInflight = useRef<WorkspaceId | null>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
   }, [conversations]);
-
-  useEffect(() => {
-    if (!conversations.some((conversation) => conversation.id === activeId)) {
-      setActiveId(conversations[0]?.id ?? createConversation().id);
-    }
-  }, [activeId, conversations]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,12 +86,36 @@ export function Chat() {
     };
   }, []);
 
+  useEffect(() => {
+    const query = SNAPSHOT_QUERY[workspace];
+    if (!query || snapshots[workspace] || snapshotInflight.current === workspace) return;
+    snapshotInflight.current = workspace;
+    setSnapshotLoading(true);
+    let cancelled = false;
+    void sendChatMessage(query, [])
+      .then((reply) => {
+        if (cancelled || !reply.view) return;
+        setSnapshots((current) => ({ ...current, [workspace]: reply.view }));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (snapshotInflight.current === workspace) snapshotInflight.current = null;
+        if (!cancelled) setSnapshotLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace, snapshots]);
+
   const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
   const lastSync = syncLabel(lastSapOkAt);
   const order = extractOrder(active?.messages ?? []);
-  const facts = contextFacts(active?.messages ?? []);
+  const facts = contextFacts(active?.messages ?? [], snapshots[workspace]);
   const commandSuggestions = useMemo(() => {
-    if (!active?.messages.length) return DEFAULT_COMMAND_SUGGESTIONS;
+    if (!active?.messages.length) {
+      const moduleActions = getModule(workspace)?.actions.slice(0, 4);
+      return moduleActions?.length ? moduleActions : DEFAULT_COMMAND_SUGGESTIONS;
+    }
     return followUpsFor(workspace, active.messages.at(-1)?.content);
   }, [workspace, active]);
 
@@ -137,10 +158,13 @@ export function Chat() {
   }
 
   function deleteChat(id: string) {
-    setConversations((current) => {
-      const remaining = current.filter((conversation) => conversation.id !== id);
-      return remaining.length > 0 ? remaining : [createConversation()];
-    });
+    const remaining = conversations.filter((conversation) => conversation.id !== id);
+    const next = remaining.length > 0 ? remaining : [createConversation()];
+    setConversations(next);
+    if (activeId === id) {
+      setActiveId(next[0].id);
+      setWorkspace(next[0].module ?? "overview");
+    }
   }
 
   function pinChat(id: string) {
@@ -190,6 +214,11 @@ export function Chat() {
         view: reply.view,
         suggestions: reply.suggestions,
       };
+      if (reply.view) {
+        const view = reply.view;
+        const snapshotModule = module === "overview" ? workspace : module;
+        setSnapshots((current) => ({ ...current, [snapshotModule]: view }));
+      }
       setConversations((current) =>
         current.map((conversation) =>
           conversation.id === active.id
@@ -224,18 +253,18 @@ export function Chat() {
   }
 
   const module = workspace === "overview" ? undefined : getModule(workspace);
-  const heading = module ? `${module.name} Intelligence` : "Fabric & Sales Intelligence";
 
   return (
     <div className={`app-shell ${contextOpen ? "has-context" : ""}`}>
       <AppHeader
-        title="AI Copilot"
-        subtitle={heading}
+        title="EVOLV AI Copilot"
+        subtitle={module ? `${module.name} · ${module.source}` : "Sales · Quotations · Materials · Procurement · BOM · Trims · Fabric"}
         health={health}
         lastSync={lastSync}
         contextOpen={contextOpen}
         onMenu={() => setSidebarOpen(true)}
         onToggleContext={() => setContextOpen((open) => !open)}
+        onNewChat={() => startNewChat()}
       />
       <Sidebar
         conversations={conversations}
@@ -257,7 +286,10 @@ export function Chat() {
           messages={active?.messages ?? []}
           loading={loading}
           workspace={workspace}
+          snapshot={snapshots[workspace]}
+          snapshotLoading={snapshotLoading && !snapshots[workspace]}
           onAsk={(question, nextModule) => void sendMessage(question, undefined, nextModule ?? workspace)}
+          onOpenModule={(id) => openWorkspace(id)}
           onRetry={regenerate}
         />
         <CommandBar

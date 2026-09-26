@@ -3,36 +3,39 @@ import type { AssistantView, ChatMessage, ReplySuggestion, WorkspaceId } from ".
 
 export const LANDING_CARDS = [
   { label: "Analyze Sales", question: "This month's sales summary", module: "sales" as const },
-  { label: "Track Procurement", question: "View procurement details for a sales order", module: "procurement" as const },
-  { label: "Check Materials", question: "Materials created this month", module: "materials" as const },
-  { label: "Analyze BOM", question: "Show BOM components for a sales order", module: "bom" as const },
-  { label: "Review Fabric", question: "Show fabric utilization for a sales order", module: "fabric" as const },
   { label: "Quotation Insights", question: "This month's quotations", module: "quotations" as const },
-  { label: "Production Overview", question: "Show pending sales orders this month", module: "sales" as const },
+  { label: "Check Materials", question: "Materials created this month", module: "materials" as const },
+  { label: "Track Procurement", question: "View procurement details for a sales order", module: "procurement" as const },
+  { label: "Analyze BOM", question: "Show BOM components for a sales order", module: "bom" as const },
+  { label: "Review Trims", question: "Show trims utilization for a sales order", module: "trims" as const },
+  { label: "Review Fabric", question: "Show fabric utilization for a sales order", module: "fabric" as const },
 ];
 
 export const LANDING_EXAMPLES = [
   "Which sales orders have pending deliveries this month?",
-  "Show pending procurement for this month.",
+  "This month's quotations",
   "Materials created this month.",
-  "Compare this month's quotations with last month.",
-  "Show BOM components for an active sales order.",
+  "View procurement details for a sales order.",
+  "Show BOM components for a sales order.",
+  "Show trims utilization for a sales order.",
+  "Show fabric utilization for a sales order.",
 ];
 
 export const DEFAULT_COMMAND_SUGGESTIONS = [
-  { label: "Analyze sales order 42003", question: "Show sales order 42003" },
-  { label: "Show pending materials", question: "Materials created this month" },
-  { label: "Compare fabric utilization", question: "Show fabric utilization for a sales order" },
+  { label: "Sales summary", question: "This month's sales summary" },
+  { label: "Quotations", question: "This month's quotations" },
+  { label: "Materials", question: "Materials created this month" },
+  { label: "Fabric utilization", question: "Show fabric utilization for a sales order" },
 ];
 
 export const WORKSPACE_CHIPS: ReplySuggestion[] = [
-  { label: "Sales Order Analysis", question: "This month's sales summary" },
-  { label: "Fabric Utilization", question: "Show fabric utilization for a sales order" },
-  { label: "Pending Procurement", question: "View procurement details for a sales order" },
-  { label: "Material Availability", question: "Materials created this month" },
-  { label: "BOM Analysis", question: "Show BOM components for a sales order" },
-  { label: "Quotation Conversion", question: "This month's quotations" },
-  { label: "Production Status", question: "Show pending sales orders this month" },
+  { label: "Sales Analysis", question: "This month's sales summary" },
+  { label: "Quotations", question: "This month's quotations" },
+  { label: "Materials", question: "Materials created this month" },
+  { label: "Procurement", question: "View procurement details for a sales order" },
+  { label: "BOM / COOIS", question: "Show BOM components for a sales order" },
+  { label: "Trims", question: "Show trims utilization for a sales order" },
+  { label: "Fabric", question: "Show fabric utilization for a sales order" },
 ];
 
 export const PROCESS_STEPS = ["Sales Order", "BOM", "Materials", "Procurement", "Fabric", "Production"];
@@ -43,6 +46,28 @@ export const LOADING_STEPS = [
   "Analyzing records…",
   "Generating insights…",
 ];
+
+export const SNAPSHOT_QUERY: Partial<Record<WorkspaceId, string>> = {
+  overview: "This month's sales summary",
+  sales: "This month's sales summary",
+  quotations: "This month's quotations",
+  materials: "Materials created this month",
+};
+
+export function kpiLines(value: string): string[] {
+  const parts = value.split(/,\s+(?=[A-Z]{3}\s)/);
+  return parts.length > 0 ? parts : [value];
+}
+
+export function factsFromView(view?: AssistantView | null): Array<{ label: string; value: string }> {
+  if (!view) return [];
+  const facts = view.kpis.slice(0, 6).map((kpi) => ({ label: kpi.label, value: kpi.value }));
+  if (view.provenance) {
+    facts.push({ label: "Records", value: view.provenance.recordCount.toLocaleString("en-US") });
+    facts.push({ label: "Period", value: view.provenance.period });
+  }
+  return facts;
+}
 
 export function isEmptyAnswer(content: string): boolean {
   return /no records were found|no quotations were found|no sales records were found/i.test(content);
@@ -115,13 +140,7 @@ export function extractOrder(messages: ChatMessage[]): string | null {
   return null;
 }
 
-export function contextFacts(messages: ChatMessage[]): Array<{ label: string; value: string }> {
-  const lastView = [...messages].reverse().find((message) => message.view)?.view;
-  if (!lastView) return [];
-  const facts = lastView.kpis.slice(0, 6).map((kpi) => ({ label: kpi.label, value: kpi.value }));
-  if (lastView.provenance) {
-    facts.push({ label: "Records", value: lastView.provenance.recordCount.toLocaleString("en-US") });
-    facts.push({ label: "Period", value: lastView.provenance.period });
-  }
-  return facts;
+export function contextFacts(messages: ChatMessage[], fallback?: AssistantView | null): Array<{ label: string; value: string }> {
+  const lastView = [...messages].reverse().find((message) => message.view)?.view ?? fallback;
+  return factsFromView(lastView);
 }

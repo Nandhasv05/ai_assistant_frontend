@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { insightFrom, PROCESS_STEPS, recommendedActions } from "../lib/copilot.ts";
+import { insightFrom, kpiLines, PROCESS_STEPS, recommendedActions } from "../lib/copilot.ts";
+import { NavIcon } from "./NavIcon.tsx";
 import { exportUrl } from "../services/api.ts";
 import { downloadPdf } from "../services/pdf.ts";
 import { MiniChart } from "./MiniChart.tsx";
@@ -44,11 +45,6 @@ function triggerDownload(href: string): void {
   document.body.appendChild(link);
   link.click();
   link.remove();
-}
-
-function kpiLines(value: string): string[] {
-  const parts = value.split(/,\s+(?=[A-Z]{3}\s)/);
-  return parts.length > 0 ? parts : [value];
 }
 
 function compareCells(a: string, b: string): number {
@@ -244,7 +240,10 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
 
       {insight && (
         <aside className="insight-card">
-          <p>AI insight</p>
+          <div className="insight-head">
+            <NavIcon name="insight" />
+            <p>AI insight</p>
+          </div>
           <strong>{insight}</strong>
         </aside>
       )}

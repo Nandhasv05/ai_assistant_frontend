@@ -109,6 +109,6 @@ export function getModule(id: ModuleId): AppModule | undefined {
 }
 
 export function moduleTitle(id: ModuleId): string {
-  if (id === "overview") return "Overview";
+  if (id === "overview") return "Business Overview";
   return getModule(id)?.name ?? "Workspace";
 }
