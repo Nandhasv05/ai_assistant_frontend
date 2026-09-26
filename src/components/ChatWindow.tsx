@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LOADING_STEPS } from "../lib/copilot.ts";
-import type { AssistantView, ChatMessage, WorkspaceId } from "../types.ts";
+import type { ChatMessage, WorkspaceId } from "../types.ts";
 import { CopilotTurn } from "./CopilotTurn.tsx";
 import { Landing } from "./Landing.tsx";
 
@@ -8,14 +8,11 @@ interface ChatWindowProps {
   messages: ChatMessage[];
   loading: boolean;
   workspace: WorkspaceId;
-  snapshot?: AssistantView;
-  snapshotLoading?: boolean;
   onAsk: (question: string, module?: Exclude<WorkspaceId, "overview">) => void;
-  onOpenModule?: (id: Exclude<WorkspaceId, "overview">) => void;
   onRetry: () => void;
 }
 
-export function ChatWindow({ messages, loading, workspace, snapshot, snapshotLoading, onAsk, onOpenModule, onRetry }: ChatWindowProps) {
+export function ChatWindow({ messages, loading, workspace, onAsk, onRetry }: ChatWindowProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
 
@@ -32,15 +29,7 @@ export function ChatWindow({ messages, loading, workspace, snapshot, snapshotLoa
   const lastUser = [...messages].reverse().find((message) => message.role === "user")?.content;
 
   if (messages.length === 0 && !loading) {
-    return (
-      <Landing
-        workspace={workspace}
-        snapshot={snapshot}
-        snapshotLoading={snapshotLoading}
-        onAsk={onAsk}
-        onOpenModule={onOpenModule}
-      />
-    );
+    return <Landing workspace={workspace} />;
   }
 
   return (

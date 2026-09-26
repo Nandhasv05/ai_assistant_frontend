@@ -3,39 +3,36 @@ import type { AssistantView, ChatMessage, ReplySuggestion, WorkspaceId } from ".
 
 export const LANDING_CARDS = [
   { label: "Analyze Sales", question: "This month's sales summary", module: "sales" as const },
-  { label: "Quotation Insights", question: "This month's quotations", module: "quotations" as const },
-  { label: "Check Materials", question: "Materials created this month", module: "materials" as const },
   { label: "Track Procurement", question: "View procurement details for a sales order", module: "procurement" as const },
+  { label: "Check Materials", question: "Materials created this month", module: "materials" as const },
   { label: "Analyze BOM", question: "Show BOM components for a sales order", module: "bom" as const },
-  { label: "Review Trims", question: "Show trims utilization for a sales order", module: "trims" as const },
   { label: "Review Fabric", question: "Show fabric utilization for a sales order", module: "fabric" as const },
+  { label: "Quotation Insights", question: "This month's quotations", module: "quotations" as const },
+  { label: "Production Overview", question: "Show pending sales orders this month", module: "sales" as const },
 ];
 
 export const LANDING_EXAMPLES = [
   "Which sales orders have pending deliveries this month?",
-  "This month's quotations",
+  "Show pending procurement for this month.",
   "Materials created this month.",
-  "View procurement details for a sales order.",
-  "Show BOM components for a sales order.",
-  "Show trims utilization for a sales order.",
-  "Show fabric utilization for a sales order.",
+  "Compare this month's quotations with last month.",
+  "Show BOM components for an active sales order.",
 ];
 
 export const DEFAULT_COMMAND_SUGGESTIONS = [
-  { label: "Sales summary", question: "This month's sales summary" },
-  { label: "Quotations", question: "This month's quotations" },
-  { label: "Materials", question: "Materials created this month" },
-  { label: "Fabric utilization", question: "Show fabric utilization for a sales order" },
+  { label: "Analyze sales order 42003", question: "Show sales order 42003" },
+  { label: "Show pending materials", question: "Materials created this month" },
+  { label: "Compare fabric utilization", question: "Show fabric utilization for a sales order" },
 ];
 
 export const WORKSPACE_CHIPS: ReplySuggestion[] = [
-  { label: "Sales Analysis", question: "This month's sales summary" },
-  { label: "Quotations", question: "This month's quotations" },
-  { label: "Materials", question: "Materials created this month" },
-  { label: "Procurement", question: "View procurement details for a sales order" },
-  { label: "BOM / COOIS", question: "Show BOM components for a sales order" },
-  { label: "Trims", question: "Show trims utilization for a sales order" },
-  { label: "Fabric", question: "Show fabric utilization for a sales order" },
+  { label: "Sales Order Analysis", question: "This month's sales summary" },
+  { label: "Fabric Utilization", question: "Show fabric utilization for a sales order" },
+  { label: "Pending Procurement", question: "View procurement details for a sales order" },
+  { label: "Material Availability", question: "Materials created this month" },
+  { label: "BOM Analysis", question: "Show BOM components for a sales order" },
+  { label: "Quotation Conversion", question: "This month's quotations" },
+  { label: "Production Status", question: "Show pending sales orders this month" },
 ];
 
 export const PROCESS_STEPS = ["Sales Order", "BOM", "Materials", "Procurement", "Fabric", "Production"];

@@ -85,6 +85,12 @@ export function ContextPanel({ open, workspace, order, facts, onAction, onClose 
         <button type="button" className="btn-secondary" onClick={() => onAction(order ? `Show fabric utilization for ${order}` : "Show fabric utilization for a sales order")}>
           View fabric
         </button>
+        <button type="button" className="btn-secondary" onClick={() => onAction(order ? `Show trims utilization for ${order}` : "Show trims utilization for a sales order")}>
+          View trims
+        </button>
+        <button type="button" className="btn-secondary" onClick={() => onAction("This month's quotations")}>
+          View quotations
+        </button>
       </div>
     </aside>
   );

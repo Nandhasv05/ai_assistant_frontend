@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AppHeader } from "../components/AppHeader.tsx";
 import { ChatWindow } from "../components/ChatWindow.tsx";
 import { CommandBar } from "../components/CommandBar.tsx";
-import { ContextPanel } from "../components/ContextPanel.tsx";
 import { Sidebar } from "../components/Sidebar.tsx";
-import { contextFacts, DEFAULT_COMMAND_SUGGESTIONS, extractOrder, followUpsFor, SNAPSHOT_QUERY } from "../lib/copilot.ts";
+import { followUpsFor, SNAPSHOT_QUERY } from "../lib/copilot.ts";
 import { newId } from "../lib/id.ts";
-import { getModule, moduleTitle } from "../lib/modules.ts";
 import { fetchHealth, sendChatMessage } from "../services/api.ts";
 import type { AssistantView, ChatMessage, Conversation, WorkspaceId } from "../types.ts";
 
@@ -54,11 +51,10 @@ export function Chat() {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [contextOpen, setContextOpen] = useState(true);
   const [health, setHealth] = useState<"checking" | "ok" | "down">("checking");
   const [lastSapOkAt, setLastSapOkAt] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<Partial<Record<WorkspaceId, AssistantView>>>({});
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [, setSnapshotLoading] = useState(false);
   const sendingRef = useRef(false);
   const snapshotInflight = useRef<WorkspaceId | null>(null);
 
@@ -109,13 +105,8 @@ export function Chat() {
 
   const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
   const lastSync = syncLabel(lastSapOkAt);
-  const order = extractOrder(active?.messages ?? []);
-  const facts = contextFacts(active?.messages ?? [], snapshots[workspace]);
   const commandSuggestions = useMemo(() => {
-    if (!active?.messages.length) {
-      const moduleActions = getModule(workspace)?.actions.slice(0, 4);
-      return moduleActions?.length ? moduleActions : DEFAULT_COMMAND_SUGGESTIONS;
-    }
+    if (!active?.messages.length) return [];
     return followUpsFor(workspace, active.messages.at(-1)?.content);
   }, [workspace, active]);
 
@@ -252,20 +243,8 @@ export function Chat() {
     void sendMessage(lastUser.content, lastUser.id);
   }
 
-  const module = workspace === "overview" ? undefined : getModule(workspace);
-
   return (
-    <div className={`app-shell ${contextOpen ? "has-context" : ""}`}>
-      <AppHeader
-        title="EVOLV AI Copilot"
-        subtitle={module ? `${module.name} · ${module.source}` : "Sales · Quotations · Materials · Procurement · BOM · Trims · Fabric"}
-        health={health}
-        lastSync={lastSync}
-        contextOpen={contextOpen}
-        onMenu={() => setSidebarOpen(true)}
-        onToggleContext={() => setContextOpen((open) => !open)}
-        onNewChat={() => startNewChat()}
-      />
+    <div className="app-shell">
       <Sidebar
         conversations={conversations}
         activeId={active?.id ?? ""}
@@ -274,6 +253,7 @@ export function Chat() {
         health={health}
         lastSync={lastSync}
         onClose={() => setSidebarOpen(false)}
+        onOpen={() => setSidebarOpen(true)}
         onNewChat={() => startNewChat()}
         onSelect={selectChat}
         onRename={renameChat}
@@ -281,35 +261,32 @@ export function Chat() {
         onPin={pinChat}
         onOpenWorkspace={openWorkspace}
       />
-      <main className="main-stage">
-        <ChatWindow
-          messages={active?.messages ?? []}
-          loading={loading}
-          workspace={workspace}
-          snapshot={snapshots[workspace]}
-          snapshotLoading={snapshotLoading && !snapshots[workspace]}
-          onAsk={(question, nextModule) => void sendMessage(question, undefined, nextModule ?? workspace)}
-          onOpenModule={(id) => openWorkspace(id)}
-          onRetry={regenerate}
-        />
-        <CommandBar
-          value={draft}
-          disabled={loading}
-          workspace={workspace}
-          suggestions={commandSuggestions}
-          onChange={setDraft}
-          onSend={() => void sendMessage(draft)}
-          onQuickAsk={(question) => void sendMessage(question)}
-        />
-      </main>
-      <ContextPanel
-        open={contextOpen}
-        workspace={workspace}
-        order={order}
-        facts={facts}
-        onAction={(question) => void sendMessage(question)}
-        onClose={() => setContextOpen(false)}
-      />
+      <div className="app-column">
+        <main className={`main-stage ${!(active?.messages.length) && !loading ? "is-landing" : ""}`}>
+          <ChatWindow
+            messages={active?.messages ?? []}
+            loading={loading}
+            workspace={workspace}
+            onAsk={(question, nextModule) => void sendMessage(question, undefined, nextModule ?? workspace)}
+            onRetry={regenerate}
+          />
+          <CommandBar
+            value={draft}
+            disabled={loading}
+            workspace={workspace}
+            suggestions={commandSuggestions}
+            onChange={setDraft}
+            onSend={() => void sendMessage(draft)}
+            onQuickAsk={(question) => void sendMessage(question)}
+            onUpload={(file) => {
+              setDraft((current) => {
+                const note = `Analyze uploaded file: ${file.name}`;
+                return current.trim() ? `${current.trim()}\n${note}` : note;
+              });
+            }}
+          />
+        </main>
+      </div>
     </div>
   );
 }

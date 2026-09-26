@@ -1,6 +1,6 @@
 import type { WorkspaceId } from "../types.ts";
 
-const PATHS: Record<WorkspaceId | "mic" | "attach" | "insight", string> = {
+const PATHS: Record<WorkspaceId | "mic" | "attach" | "insight" | "search" | "sidebar" | "compose" | "modules" | "chevron", string> = {
   overview: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z",
   sales: "M4 18V8m5 10V4m5 14v-7m5 7V6",
   quotations: "M7 4h10a2 2 0 0 1 2 2v14l-3.5-2-3.5 2-3.5-2L5 20V6a2 2 0 0 1 2-2z",
@@ -12,6 +12,11 @@ const PATHS: Record<WorkspaceId | "mic" | "attach" | "insight", string> = {
   mic: "M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z M7 11a5 5 0 0 0 10 0 M12 16v4",
   attach: "M15 7.5 8.6 14a2.5 2.5 0 1 0 3.5 3.5L18 11.5a4 4 0 0 0-5.7-5.6L6.4 12",
   insight: "M12 4a6 6 0 0 1 4 10.6V17H8v-2.4A6 6 0 0 1 12 4z M10 19h4",
+  search: "M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z M21 21l-4.3-4.3",
+  sidebar: "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M8 5v14",
+  compose: "M5 5h10a1 1 0 0 1 1 1v6 M14 19H6a1 1 0 0 1-1-1V9 M14.5 8.5 19 4l2 2-4.5 4.5z M13 11l2 2",
+  modules: "M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z",
+  chevron: "M8 10l4 4 4-4",
 };
 
 interface NavIconProps {

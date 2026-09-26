@@ -1,97 +1,38 @@
-import { APP_MODULES } from "../lib/modules.ts";
-import { LANDING_CARDS, LANDING_EXAMPLES, WORKSPACE_CHIPS } from "../lib/copilot.ts";
+import { useEffect, useState } from "react";
 import { getModule } from "../lib/modules.ts";
-import type { AssistantView, WorkspaceId } from "../types.ts";
-import { MetricStrip } from "./MetricStrip.tsx";
-import { NavIcon } from "./NavIcon.tsx";
+import type { WorkspaceId } from "../types.ts";
 
 interface LandingProps {
   workspace: WorkspaceId;
-  snapshot?: AssistantView;
-  snapshotLoading?: boolean;
-  onAsk: (question: string, module?: Exclude<WorkspaceId, "overview">) => void;
-  onOpenModule?: (id: Exclude<WorkspaceId, "overview">) => void;
 }
 
-export function Landing({ workspace, snapshot, snapshotLoading, onAsk, onOpenModule }: LandingProps) {
+const DEFAULT_PROMPTS = ["What's on the agenda today?", "What can I help you with?"];
+
+export function Landing({ workspace }: LandingProps) {
   const module = workspace === "overview" ? undefined : getModule(workspace);
-  const chips = module?.actions.length ? module.actions : WORKSPACE_CHIPS;
-  const cards = module
-    ? module.actions.map((action) => ({ label: action.label, question: action.question, module: module.id }))
-    : LANDING_CARDS;
+  const lines = module
+    ? [`Ask about ${module.name}`, `What can I help you with in ${module.name}?`]
+    : DEFAULT_PROMPTS;
+  const [index, setIndex] = useState(0);
+  const [phase, setPhase] = useState<"in" | "out">("in");
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setPhase("out");
+      window.setTimeout(() => {
+        setIndex((current) => (current + 1) % lines.length);
+        setPhase("in");
+      }, 320);
+    }, 4200);
+    return () => window.clearInterval(timer);
+  }, [lines.length, workspace]);
 
   return (
-    <section className={`landing ${snapshot || snapshotLoading ? "has-snapshot" : ""}`}>
-      <div className="landing-intro">
-        <div>
-          <p className="eyebrow">{module ? `${module.code} · ${module.name.toUpperCase()}` : "EVOLV AI COPILOT"}</p>
-          <h2>{module ? `${module.name} intelligence` : "Ask across all SAP business modules"}</h2>
-          <p>
-            {module?.blurb ??
-              "One AI assistant for Sales, Quotations, Materials, Procurement, BOM/COOIS, Trims, and Fabric — live SAP data, structured answers, insights, and actions."}
-          </p>
-        </div>
-        <div className="data-assurance" aria-label="Capabilities">
-          <span>7 live SAP modules</span>
-          <span>KPI · table · insight · export</span>
-          <span>Traceable data source</span>
-        </div>
+    <section className="landing landing-hero" aria-live="polite">
+      <div className={`landing-hero-copy is-${phase}`}>
+        <p className="landing-hero-kicker">{module ? `${module.name} assistant` : "Evolv Chatbot"}</p>
+        <h2 key={`${workspace}-${index}`}>{lines[index % lines.length]}</h2>
       </div>
-
-      {!module && (
-        <div className="feature-grid">
-          {APP_MODULES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="feature-card"
-              onClick={() => (onOpenModule ? onOpenModule(item.id) : onAsk(item.actions[0]?.question ?? item.blurb, item.id))}
-            >
-              <NavIcon name={item.id} />
-              <strong>{item.name}</strong>
-              <span>{item.code}</span>
-              <em>{item.blurb}</em>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <MetricStrip view={snapshot} loading={snapshotLoading} />
-
-      <p className="section-kicker">{module ? `${module.name} prompts` : "Cross-module prompts"}</p>
-      <div className="landing-chips">
-        {chips.map((chip) => (
-          <button key={chip.question} type="button" className="prompt-chip" onClick={() => onAsk(chip.question, module?.id)}>
-            {chip.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="landing-grid">
-        {cards.map((card) => (
-          <button key={card.label} type="button" className="landing-card" onClick={() => onAsk(card.question, card.module)}>
-            <span>{card.module.toUpperCase()}</span>
-            <strong>{card.label}</strong>
-            <em>{card.question}</em>
-          </button>
-        ))}
-      </div>
-
-      {!module && (
-        <section className="example-block">
-          <p className="section-kicker">Example questions</p>
-          <ul className="example-list">
-            {LANDING_EXAMPLES.map((example) => (
-              <li key={example}>
-                <button type="button" onClick={() => onAsk(example)}>
-                  <span>{example}</span>
-                  <b aria-hidden="true">→</b>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </section>
   );
 }
