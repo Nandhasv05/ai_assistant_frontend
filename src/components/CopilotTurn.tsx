@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { followUpsFor, isEmptyAnswer } from "../lib/copilot.ts";
 import type { ChatMessage, WorkspaceId } from "../types.ts";
+import { MarkdownText } from "./MarkdownText.tsx";
 import { ResultView } from "./ResultView.tsx";
 
 interface CopilotTurnProps {
@@ -71,7 +72,11 @@ export function CopilotTurn({ message, lastUser, workspace, onAsk, onRetry }: Co
     );
   }
 
-  const followUps = message.suggestions?.length ? message.suggestions : followUpsFor(workspace, lastUser);
+  const followUps = message.view?.utilization
+    ? []
+    : message.suggestions?.length
+      ? message.suggestions
+      : followUpsFor(workspace, lastUser);
 
   function copyAnswer() {
     const text = message.view
@@ -99,7 +104,7 @@ export function CopilotTurn({ message, lastUser, workspace, onAsk, onRetry }: Co
           <ResultView view={message.view} workspace={workspace} onAsk={onAsk} />
         ) : (
           <div className="text-card">
-            <p>{message.content}</p>
+            <MarkdownText text={message.content} />
           </div>
         )}
         {followUps.length > 0 && (

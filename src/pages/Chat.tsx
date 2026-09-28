@@ -59,7 +59,19 @@ export function Chat() {
   const snapshotInflight = useRef<WorkspaceId | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    const slim = conversations.map((conversation) => ({
+      ...conversation,
+      messages: conversation.messages.map((message) => {
+        const util = message.view?.utilization;
+        if (!message.view || !util || util.scope !== "summary" || !util.lines) return message;
+        return { ...message, view: { ...message.view, utilization: { ...util, lines: undefined } } };
+      }),
+    }));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+    } catch {
+      // History is best-effort; a full quota must not break the chat.
+    }
   }, [conversations]);
 
   useEffect(() => {
@@ -107,6 +119,7 @@ export function Chat() {
   const lastSync = syncLabel(lastSapOkAt);
   const commandSuggestions = useMemo(() => {
     if (!active?.messages.length) return [];
+    if (active.messages.at(-1)?.view?.utilization) return [];
     return followUpsFor(workspace, active.messages.at(-1)?.content);
   }, [workspace, active]);
 
@@ -196,8 +209,14 @@ export function Chat() {
       }),
     );
 
+    const scoped =
+      (module === "fabric" || module === "trims") &&
+      !/\b(fabrics?|trims?)\b/i.test(trimmed) &&
+      (/^\d{4,12}$/.test(trimmed) || /\b(dashboard|summary|overview|totals?|report|this month|last month|this week|last week)\b/i.test(trimmed));
+    const outgoing = scoped ? `${module} ${trimmed}` : trimmed;
+
     try {
-      const reply = await sendChatMessage(trimmed, history);
+      const reply = await sendChatMessage(outgoing, history);
       const assistantMessage: ChatMessage = {
         id: newId(),
         role: "assistant",

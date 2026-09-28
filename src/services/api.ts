@@ -43,6 +43,27 @@ function sessionId(): string {
   }
 }
 
+const CONTEXT_KEY = "ai-assistant-ctx";
+
+/** Signed portal identity token (?ctx=…) — kept for this tab only and removed from the address bar. */
+function portalContext(): string | null {
+  try {
+    const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get("ctx");
+    if (fromUrl) {
+      sessionStorage.setItem(CONTEXT_KEY, fromUrl);
+      url.searchParams.delete("ctx");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      return fromUrl;
+    }
+    return sessionStorage.getItem(CONTEXT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+portalContext();
+
 function apiPath(path: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -57,7 +78,7 @@ export async function sendChatMessage(message: string, history: ChatHistoryItem[
   try {
     response = await fetch(apiPath("/api/chat"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(portalContext() ? { "X-Evolv-Context": portalContext()! } : {}) },
       body: JSON.stringify({ message, history, sessionId: sessionId() }),
     });
   } catch {

@@ -71,11 +71,22 @@ export function isEmptyAnswer(content: string): boolean {
 }
 
 export function recommendedActions(module: WorkspaceId, view?: AssistantView): ReplySuggestion[] {
-  if (module === "fabric" || /fabric/i.test(view?.title ?? "")) {
+  const utilKind = module === "fabric" || module === "trims" ? module : /^(fabric|trims)\b/i.exec(view?.title ?? "")?.[1]?.toLowerCase();
+  if (utilKind === "fabric" || utilKind === "trims") {
+    const name = utilKind === "fabric" ? "Fabric" : "Trims";
+    const other = utilKind === "fabric" ? "trims" : "fabric";
+    const order = view?.title.match(/Sales order (\d{4,12})/i)?.[1];
+    if (order) {
+      return [
+        { label: `${other === "fabric" ? "Fabric" : "Trims"} for ${order}`, question: `Show ${other} utilization for ${order}` },
+        { label: "BOM components", question: `Show BOM components for ${order}` },
+        { label: "Sales order details", question: `Show sales order ${order}` },
+        { label: `${name} dashboard`, question: `${name} dashboard this month` },
+      ];
+    }
     return [
-      { label: "View material details", question: "Materials created this month" },
-      { label: "Open sales order", question: "Show sales order details" },
-      { label: "Analyze remaining fabric", question: "Show fabric utilization for a sales order" },
+      { label: `${name} last month`, question: `${name} dashboard last month` },
+      { label: `${other === "fabric" ? "Fabric" : "Trims"} dashboard`, question: `${other} dashboard this month` },
       { label: "Export report", question: "Make this a PDF" },
     ];
   }
@@ -109,6 +120,7 @@ export function followUpsFor(module: WorkspaceId, lastUser?: string): ReplySugge
   if (order) {
     return [
       { label: "Fabric utilization", question: `Show fabric utilization for ${order}` },
+      { label: "Trims utilization", question: `Show trims utilization for ${order}` },
       { label: "BOM", question: `Show BOM components for ${order}` },
       { label: "Procurement", question: `View procurement details for ${order}` },
       { label: "Sales details", question: `Show sales order ${order}` },

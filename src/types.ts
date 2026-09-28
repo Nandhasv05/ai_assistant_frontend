@@ -4,9 +4,60 @@ export type AssistantViewMode = "count" | "report" | "details" | "table" | "pdf"
 
 export interface ChartSpec {
   title: string;
-  kind: "bar" | "line";
+  kind: "bar" | "line" | "donut";
   labels: string[];
   series: Array<{ name: string; values: number[]; color?: string }>;
+  colors?: string[];
+}
+
+export interface UtilizationTotals {
+  orders: number;
+  materials: number;
+  lines: number;
+  bom: number;
+  planned: number;
+  production: number;
+  po: number;
+  grn: number;
+  issue: number;
+}
+
+export interface UtilizationLine {
+  salesOrder: string;
+  material: string;
+  category: string;
+  purchaseOrder: string;
+  poLine: string;
+  bom: number;
+  planned: number;
+  production: number;
+  po: number;
+  grn: number;
+  issue: number;
+  additionalOrders: string[];
+}
+
+export interface UtilizationOrder {
+  salesOrder: string;
+  materials: number;
+  lines: number;
+  bom: number;
+  planned: number;
+  production: number;
+  po: number;
+  grn: number;
+  issue: number;
+}
+
+export interface UtilizationPayload {
+  kind: "fabric" | "trims";
+  scope: "order" | "summary";
+  salesOrder?: string;
+  period?: string;
+  totals: UtilizationTotals;
+  lines?: UtilizationLine[];
+  orders?: UtilizationOrder[];
+  mix?: { title: string; labels: string[]; values: number[] };
 }
 
 export interface AssistantView {
@@ -15,7 +66,9 @@ export interface AssistantView {
   kpis: Array<{ label: string; value: string }>;
   columns: string[];
   rows: string[][];
+  footer?: string[];
   charts?: ChartSpec[];
+  utilization?: UtilizationPayload;
   sections?: Array<{ title: string; columns: string[]; rows: string[][] }>;
   bullets?: string[];
   source?: string;

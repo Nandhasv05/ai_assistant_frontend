@@ -4,6 +4,7 @@ import { NavIcon } from "./NavIcon.tsx";
 import { exportUrl } from "../services/api.ts";
 import { downloadPdf } from "../services/pdf.ts";
 import { MiniChart } from "./MiniChart.tsx";
+import { UtilizationView } from "./UtilizationView.tsx";
 import type { AssistantView, WorkspaceId } from "../types.ts";
 
 const MODE_LABEL: Record<AssistantView["mode"], string> = {
@@ -37,16 +38,6 @@ function relativeTime(iso?: string): string | null {
   return `${Math.round(minutes / 60)} h ago`;
 }
 
-function triggerDownload(href: string): void {
-  const link = document.createElement("a");
-  link.href = href;
-  link.rel = "noopener";
-  link.download = "";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
-
 function compareCells(a: string, b: string): number {
   const left = Number(a.replace(/[^0-9.-]/g, ""));
   const right = Number(b.replace(/[^0-9.-]/g, ""));
@@ -54,7 +45,7 @@ function compareCells(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function DataTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
+function DataTable({ columns, rows, footer }: { columns: string[]; rows: string[][]; footer?: string[] }) {
   const [sort, setSort] = useState<{ index: number; dir: 1 | -1 } | null>(null);
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [copied, setCopied] = useState(false);
@@ -74,7 +65,9 @@ function DataTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
           type="button"
           className="btn-secondary"
           onClick={() => {
-            void navigator.clipboard.writeText([columns.join("\t"), ...sorted.map((row) => row.join("\t"))].join("\n"));
+            void navigator.clipboard.writeText(
+              [columns.join("\t"), ...sorted.map((row) => row.join("\t")), ...(footer ? [footer.join("\t")] : [])].join("\n"),
+            );
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1400);
           }}
@@ -109,6 +102,15 @@ function DataTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
               </tr>
             ))}
           </tbody>
+          {footer && footer.length > 0 && (
+            <tfoot>
+              <tr>
+                {footer.map((cell, index) => (
+                  <td key={`${columns[index] ?? index}-foot`}>{cell}</td>
+                ))}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
       {visible < sorted.length && (
@@ -124,25 +126,27 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
   const downloaded = useRef(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [shared, setShared] = useState(false);
+  const utilization = view.utilization;
   const manyItems = view.mode === "details" && view.rows.length > 12;
   const showTable =
+    !utilization &&
     view.columns.length > 0 &&
     (manyItems || ["table", "report", "pdf", "dashboard", "comparison", "chart"].includes(view.mode));
-  const showDetails = view.mode === "details" && !manyItems;
-  const showCounts = view.kpis.length > 0;
-  const charts = view.charts ?? [];
+  const showDetails = !utilization && view.mode === "details" && !manyItems;
+  const showCounts = !utilization && view.kpis.length > 0;
+  const charts = utilization ? [] : (view.charts ?? []);
   const sections = view.sections ?? [];
   const insight = insightFrom(view);
   const actions = recommendedActions(workspace, view);
   const formats = view.exportId ? (view.exportFormats ?? ["pdf"]) : [];
   const retrieved = view.provenance?.retrievedAt ?? view.updatedAt;
-  const showFlow = /sales order|fabric|bom|procurement/i.test(view.title);
+  const showFlow = !utilization && /sales order|fabric|bom|procurement/i.test(view.title);
 
   useEffect(() => {
-    if (view.mode === "pdf" && !downloaded.current) {
+    const fresh = !view.updatedAt || Date.now() - new Date(view.updatedAt).getTime() < 60_000;
+    if (view.mode === "pdf" && fresh && !downloaded.current) {
       downloaded.current = true;
-      if (view.exportId) triggerDownload(exportUrl(view.exportId, "pdf"));
-      else downloadPdf(view);
+      downloadPdf(view);
     }
   }, [view]);
 
@@ -154,17 +158,16 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
           <h3>{view.title}</h3>
         </div>
         <div className="export-actions">
-          {formats.length > 0 ? (
-            formats.map((format) => (
+          <button type="button" className="btn-secondary" onClick={() => downloadPdf(view)}>
+            Export PDF
+          </button>
+          {formats
+            .filter((format) => format !== "pdf")
+            .map((format) => (
               <a key={format} className="btn-secondary" href={exportUrl(view.exportId!, format)} download>
                 Export {FORMAT_LABEL[format]}
               </a>
-            ))
-          ) : (
-            <button type="button" className="btn-secondary" onClick={() => downloadPdf(view)}>
-              Export PDF
-            </button>
-          )}
+            ))}
           <button
             type="button"
             className="btn-secondary"
@@ -189,6 +192,8 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
         </ol>
       )}
 
+      {utilization && <UtilizationView data={utilization} onAsk={onAsk} />}
+
       {showCounts && (
         <div className="result-kpis">
           {view.kpis.map((kpi) => (
@@ -196,7 +201,9 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
               <span className="kpi-label">{kpi.label}</span>
               <div className="kpi-values">
                 {kpiLines(kpi.value).map((line) => (
-                  <strong key={line}>{line}</strong>
+                  <strong key={line} className={line.length > 12 ? "is-long" : undefined}>
+                    {line}
+                  </strong>
                 ))}
               </div>
             </article>
@@ -212,7 +219,7 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
         </div>
       )}
 
-      {showTable && <DataTable columns={view.columns} rows={view.rows} />}
+      {showTable && <DataTable columns={view.columns} rows={view.rows} footer={view.footer} />}
 
       {sections.map((section) => (
         <div key={section.title} className="result-section">
@@ -238,7 +245,7 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
         </div>
       )}
 
-      {insight && (
+      {!utilization && insight && (
         <aside className="insight-card">
           <div className="insight-head">
             <NavIcon name="insight" />
@@ -248,7 +255,7 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
         </aside>
       )}
 
-      {onAsk && (
+      {!utilization && onAsk && (
         <div className="action-row">
           <span>Recommended actions</span>
           {actions.map((action) => (
@@ -259,6 +266,7 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
         </div>
       )}
 
+      {!utilization && (
       <details className="source-box" open={sourceOpen} onToggle={(event) => setSourceOpen(event.currentTarget.open)}>
         <summary>How this answer was generated</summary>
         <dl>
@@ -299,6 +307,7 @@ export function ResultView({ view, workspace, onAsk }: ResultViewProps) {
           </button>
         ) : null}
       </details>
+      )}
     </section>
   );
 }

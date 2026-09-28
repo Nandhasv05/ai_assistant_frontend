@@ -77,12 +77,12 @@ export function CommandBar({
         </button>
 
         <label className="sr-only" htmlFor="copilot-input">
-          Ask a sales question
+          Ask a question
         </label>
         <textarea
           id="copilot-input"
           rows={1}
-          placeholder="Ask a sales question..."
+          placeholder="Ask a question..."
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
