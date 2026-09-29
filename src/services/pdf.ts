@@ -115,14 +115,13 @@ class Booklet {
   page!: Page;
   y = 0;
 
-  addPage(landscape = false): Page {
-    const size = landscape ? { width: A4.height, height: A4.width } : { width: A4.width, height: A4.height };
+  /** Every page is A4 portrait so the booklet prints on A4 without rotation. */
+  addPage(): Page {
     if (this.page && this.page.ops.length === 0 && this.pages.includes(this.page)) {
-      Object.assign(this.page, size);
       this.y = TOP;
       return this.page;
     }
-    const page: Page = { ...size, ops: [] };
+    const page: Page = { width: A4.width, height: A4.height, ops: [] };
     this.pages.push(page);
     this.page = page;
     this.y = TOP;
@@ -133,9 +132,8 @@ class Booklet {
     return this.page.width - MARGIN * 2;
   }
 
-  ensure(space: number, landscape?: boolean): void {
-    const wantLandscape = landscape ?? this.page.width > this.page.height;
-    if (this.y + space > this.page.height - BOTTOM || (landscape !== undefined && (this.page.width > this.page.height) !== wantLandscape)) this.addPage(wantLandscape);
+  ensure(space: number): void {
+    if (this.y + space > this.page.height - BOTTOM) this.addPage();
   }
 
   text(x: number, y: number, value: string, size: number, font: FontId = "F1", gray = 0, align: "left" | "right" | "center" = "left", page = this.page): void {
@@ -350,10 +348,57 @@ function keepRows(count: number): number {
 
 const NUMERIC = /^[+\-−]?[\d,]+(\.\d+)?%?( [A-Z]{2,3})?$|^[—-]$|^n\/a$/;
 
+const SPLIT_SIZE = 6.8;
+
+/**
+ * Column groups that each fit the A4 portrait width at a readable size. Leading key columns
+ * (first column, plus "Item" when it follows) repeat in every group so rows can be matched.
+ */
+function columnGroups(columns: string[], rows: string[][], available: number): number[][] {
+  const sample = rows.slice(0, 300);
+  const widths = columns.map((column, index) => {
+    const content = Math.max(0, ...sample.map((row) => textWidth(row[index] ?? "", SPLIT_SIZE)));
+    const word = Math.max(...column.toUpperCase().split(/\s+/).map((part) => textWidth(part, SPLIT_SIZE - 0.8, "F2")));
+    return Math.min(170, Math.max(content, Math.min(word, 46))) + 10;
+  });
+  const total = widths.reduce((sum, value) => sum + value, 0);
+  if (total <= available || columns.length <= 2) return [columns.map((_, index) => index)];
+  const keys = /^item$/i.test(columns[1] ?? "") ? [0, 1] : [0];
+  const keyWidth = keys.reduce((sum, index) => sum + widths[index], 0);
+  const groups: number[][] = [];
+  let current: number[] = [];
+  let width = keyWidth;
+  columns.forEach((_, index) => {
+    if (keys.includes(index)) return;
+    if (current.length && width + widths[index] > available) {
+      groups.push(current);
+      current = [];
+      width = keyWidth;
+    }
+    current.push(index);
+    width += widths[index];
+  });
+  if (current.length) groups.push(current);
+  return groups.map((group) => [...keys, ...group]);
+}
+
 function drawTable(doc: Booklet, columns: string[], rows: string[][], footer?: string[], caption?: string): void {
-  const landscape = columns.length > 9;
-  doc.ensure(60, landscape);
-  let size = columns.length > 14 ? 6.2 : columns.length > 9 ? 6.8 : 7.6;
+  const groups = columnGroups(columns, rows, doc.contentWidth);
+  if (groups.length === 1) {
+    drawTablePart(doc, columns, rows, footer, caption);
+    return;
+  }
+  groups.forEach((group, index) => {
+    const pick = (list: string[]) => group.map((column) => list[column] ?? "");
+    const label = `Part ${index + 1} of ${groups.length}: ${group.map((column) => columns[column]).join(", ")}`;
+    if (index > 0) doc.ensure(keepRows(rows.length));
+    drawTablePart(doc, pick(columns), rows.map(pick), footer ? pick(footer) : undefined, caption ? `${caption} · ${label}` : label);
+  });
+}
+
+function drawTablePart(doc: Booklet, columns: string[], rows: string[][], footer?: string[], caption?: string): void {
+  doc.ensure(60);
+  let size = columns.length > 9 ? 6.8 : 7.6;
   const pad = 5;
   const sample = rows.slice(0, 300);
   const numeric = columns.map((_, index) => sample.length > 0 && sample.every((row) => NUMERIC.test((row[index] ?? "").trim()) || !(row[index] ?? "").trim()));
@@ -421,7 +466,7 @@ function drawTable(doc: Booklet, columns: string[], rows: string[][], footer?: s
   header();
   rows.forEach((row, rowIndex) => {
     if (doc.y + rowH > doc.page.height - BOTTOM) {
-      doc.addPage(landscape);
+      doc.addPage();
       doc.text(MARGIN, doc.y + 6, "(continued)", 7, "F1", 0.45);
       doc.y += 12;
       header();
@@ -439,13 +484,16 @@ function drawTable(doc: Booklet, columns: string[], rows: string[][], footer?: s
   doc.line(MARGIN, doc.y, MARGIN + available, doc.y, 0.6, 0);
   if (footer?.some(Boolean)) {
     if (doc.y + rowH > doc.page.height - BOTTOM) {
-      doc.addPage(landscape);
+      doc.addPage();
       header();
     }
     let x = MARGIN;
+    let labelWidth = widths[0];
+    for (let index = 1; index < columns.length && !(footer[index] ?? "").trim(); index += 1) labelWidth += widths[index];
     footer.forEach((cell, index) => {
       if (index >= columns.length) return;
-      doc.text(numeric[index] || index > 0 ? x + widths[index] - pad : x + pad, doc.y + rowH / 2 + size * 0.35, fit(cell ?? "", widths[index] - pad * 2, size, "F2"), size, "F2", 0, index > 0 ? "right" : "left");
+      if (index === 0) doc.text(x + pad, doc.y + rowH / 2 + size * 0.35, fit(cell ?? "", labelWidth - pad * 2, size, "F2"), size, "F2", 0, "left");
+      else doc.text(x + widths[index] - pad, doc.y + rowH / 2 + size * 0.35, fit(cell ?? "", widths[index] - pad * 2, size, "F2"), size, "F2", 0, "right");
       x += widths[index];
     });
     doc.y += rowH;
@@ -490,7 +538,7 @@ export function buildBooklet(view: AssistantView, summary?: string): Blob {
   const modeTitle = MODE_TITLE[view.mode] ?? "Report";
 
   // Content pages first (cover is prepended afterwards so contents can show page numbers).
-  doc.addPage(false);
+  doc.addPage();
   let section = 0;
   const next = () => String(++section);
 
@@ -504,19 +552,15 @@ export function buildBooklet(view: AssistantView, summary?: string): Blob {
   }
   if (view.columns.length && view.rows.length) {
     const number = next();
-    if (view.columns.length > 9) doc.addPage(true);
     sectionHeading(doc, number, view.mode === "comparison" ? "Comparison" : "Detailed data", contents, keepRows(view.rows.length));
     drawTable(doc, view.columns, view.rows, view.footer, `${view.rows.length.toLocaleString("en-US")} rows`);
   }
   for (const extra of view.sections ?? []) {
     if (!extra.rows.length) continue;
     const number = next();
-    if (extra.columns.length > 9 && doc.page.width < doc.page.height) doc.addPage(true);
-    else if (extra.columns.length <= 9 && doc.page.width > doc.page.height) doc.addPage(false);
     sectionHeading(doc, number, extra.title, contents, keepRows(extra.rows.length));
     drawTable(doc, extra.columns, extra.rows);
   }
-  if (doc.page.width > doc.page.height) doc.addPage(false);
   sectionHeading(doc, next(), "Notes", contents);
   const notes = [
     `Data source: ${view.source ?? "SAP S/4HANA"} (read-only extract).`,
@@ -529,7 +573,7 @@ export function buildBooklet(view: AssistantView, summary?: string): Blob {
   // Cover page.
   const contentPages = doc.pages;
   doc.pages = [];
-  const cover = doc.addPage(false);
+  const cover = doc.addPage();
   const width = cover.width - MARGIN * 2;
   doc.rect(MARGIN, 60, width, 6, 0);
   doc.text(MARGIN, 96, "EVOLV CLOTHING", 11, "F2", 0);
